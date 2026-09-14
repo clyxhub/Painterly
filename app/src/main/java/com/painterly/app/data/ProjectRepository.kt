@@ -61,33 +61,51 @@ class ProjectRepository private constructor(private val context: Context) {
     fun createProject(uri: Uri, name: String): Project {
         val id = UUID.randomUUID().toString()
         projectDir(id).mkdirs()
-        val reference = BitmapLoader.decodeNormalized(context, uri, referenceMaxDimension())
-            ?: throw IOException("Could not open that image")
+        // Copy the picked stream to a local file once, so decoding does not depend on the
+        // provider allowing the stream to be reopened. This is the most common cause of
+        // "could not import" failures across gallery/photo providers.
+        val temp = File(projectDir(id), "import_tmp")
         try {
-            FileOutputStream(referenceFile(id)).use {
-                reference.compress(Bitmap.CompressFormat.JPEG, 92, it)
+            val opened = context.contentResolver.openInputStream(uri)
+                ?: throw IOException("Could not read the selected image")
+            opened.use { input ->
+                FileOutputStream(temp).use { output -> input.copyTo(output) }
             }
-            val thumb = BitmapLoader.scaleToFit(reference, THUMBNAIL_MAX)
+            if (temp.length() == 0L) throw IOException("The selected image is empty")
+
+            val reference = BitmapLoader.decodeNormalized(temp, referenceMaxDimension())
+                ?: throw IOException("Unsupported or corrupt image")
             try {
-                FileOutputStream(thumbnailFile(id)).use {
-                    thumb.compress(Bitmap.CompressFormat.JPEG, 85, it)
+                FileOutputStream(referenceFile(id)).use {
+                    reference.compress(Bitmap.CompressFormat.JPEG, 92, it)
                 }
+                val thumb = BitmapLoader.scaleToFit(reference, THUMBNAIL_MAX)
+                try {
+                    FileOutputStream(thumbnailFile(id)).use {
+                        thumb.compress(Bitmap.CompressFormat.JPEG, 85, it)
+                    }
+                } finally {
+                    if (thumb !== reference) thumb.recycle()
+                }
+                val now = System.currentTimeMillis()
+                val project = Project(
+                    id = id,
+                    name = name.ifBlank { "Untitled Painting" },
+                    createdAt = now,
+                    updatedAt = now,
+                    referenceWidth = reference.width,
+                    referenceHeight = reference.height,
+                )
+                saveProject(project)
+                return project
             } finally {
-                if (thumb !== reference) thumb.recycle()
+                reference.recycle()
             }
-            val now = System.currentTimeMillis()
-            val project = Project(
-                id = id,
-                name = name.ifBlank { "Untitled Painting" },
-                createdAt = now,
-                updatedAt = now,
-                referenceWidth = reference.width,
-                referenceHeight = reference.height,
-            )
-            saveProject(project)
-            return project
+        } catch (e: Exception) {
+            projectDir(id).deleteRecursively()
+            throw e
         } finally {
-            reference.recycle()
+            temp.delete()
         }
     }
 

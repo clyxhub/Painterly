@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Painterly — browser test build</title>
+<style>
+  :root{
+    --paper:#f4eee3; --paper2:#e8dfcd; --ink:#23212b; --inksoft:#565265;
+    --accent:#b4552d; --accentsoft:#e7b486; --bg:#141317; --panel:#211f27;
+    --panelelev:#2a2833; --line:#3a3743; --pane:#fbf7ef;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;margin:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:#efe9dd; overflow:hidden; user-select:none;
+  }
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column;}
+
+  /* ---------- home ---------- */
+  #home{
+    position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;
+    padding:28px 22px;background:var(--paper);color:var(--ink);overflow:auto;
+  }
+  #home h1{font-size:34px;margin:0 0 4px;letter-spacing:-.5px;}
+  #home .sub{color:var(--inksoft);margin:0 0 22px;font-size:15px;}
+  .bigbtn{
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    background:var(--accent);color:#fff;border-radius:16px;height:58px;
+    font-size:16px;font-weight:600;width:100%;
+  }
+  .bigbtn:active{filter:brightness(.94);}
+  .homecard{
+    margin-top:26px;background:#fff;border-radius:20px;padding:22px;
+    box-shadow:0 1px 0 rgba(0,0,0,.04);color:var(--ink);
+  }
+  .homecard h3{margin:0 0 6px;font-size:17px;}
+  .homecard p{margin:0;color:var(--inksoft);font-size:14px;line-height:1.5;}
+  .homecard ul{margin:10px 0 0;padding-left:18px;color:var(--inksoft);font-size:13.5px;line-height:1.7;}
+
+  /* ---------- workspace ---------- */
+  #workspace{display:none;flex:1;min-height:0;flex-direction:column;}
+  #toolbar{
+    display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--panel);
+    flex:0 0 auto;
+  }
+  #toolbar .title{flex:1;font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .tbtn{
+    min-width:40px;height:40px;border-radius:12px;display:flex;align-items:center;
+    justify-content:center;font-size:13px;color:#efe9dd;background:transparent;padding:0 10px;
+  }
+  .tbtn:active{background:#33313c;}
+  .tbtn.on{background:var(--accent);color:#fff;}
+
+  #stageArea{position:relative;flex:1;min-height:0;overflow:hidden;background:#0f0e12;}
+  #view{position:absolute;inset:0;width:100%;height:100%;touch-action:none;}
+
+  .overlay{
+    position:absolute;left:0;right:0;padding:10px;display:flex;justify-content:space-between;
+    align-items:flex-start;gap:8px;pointer-events:none;
+  }
+  .overlay > *{pointer-events:auto;}
+  .seg{display:flex;background:rgba(33,31,39,.92);border-radius:12px;padding:3px;gap:2px;backdrop-filter:blur(6px);}
+  .seg button{padding:7px 12px;border-radius:9px;font-size:13px;color:#c9c4d1;}
+  .seg button.on{background:var(--accent);color:#fff;font-weight:600;}
+  .toolgroup{display:flex;background:rgba(33,31,39,.92);border-radius:12px;padding:3px;backdrop-filter:blur(6px);}
+  .toolgroup button{width:40px;height:36px;border-radius:9px;color:#efe9dd;}
+  .toolgroup button.on{background:var(--accent);color:#fff;}
+
+  #progressWrap{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.08);display:none;}
+  #progressBar{height:100%;width:0%;background:var(--accent);transition:width .15s;}
+  #busy{
+    position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(15,14,18,.55);z-index:10;
+  }
+  #busy .box{background:var(--panel);border-radius:16px;padding:18px 22px;font-size:14px;display:flex;align-items:center;gap:12px;}
+  .spinner{width:18px;height:18px;border:2px solid #4a4756;border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ---------- bottom panel ---------- */
+  #panel{
+    flex:0 0 auto;background:var(--panel);border-top:1px solid var(--line);
+    max-height:52vh;display:flex;flex-direction:column;
+  }
+  #panelHead{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;}
+  #panelHead .q{flex:1;min-width:0;}
+  #panelHead .q b{display:block;font-size:12.5px;color:var(--accentsoft);letter-spacing:.6px;text-transform:uppercase;}
+  #panelHead .q span{display:block;font-size:13.5px;color:#b8b3c0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #chev{font-size:18px;color:#b8b3c0;transition:transform .2s;}
+  #panel.open #chev{transform:rotate(180deg);}
+  #panelBody{overflow:auto;padding:0 14px 16px;display:none;}
+  #panel.open #panelBody{display:block;}
+
+  .strip{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;}
+  .strip button{
+    flex:0 0 auto;background:var(--panelelev);border-radius:14px;padding:8px 14px;
+    display:flex;flex-direction:column;align-items:center;color:#efe9dd;
+  }
+  .strip button .n{font-size:10.5px;opacity:.6;}
+  .strip button .l{font-size:13px;font-weight:600;letter-spacing:.3px;}
+  .strip button.on{background:var(--accent);color:#fff;}
+
+  .row{display:flex;align-items:center;gap:10px;margin:12px 0;}
+  .row .lbl{font-size:13.5px;color:#efe9dd;flex:1;}
+  .mini{display:flex;gap:6px;}
+  .mini button{background:var(--panelelev);border-radius:10px;padding:8px 14px;font-size:13px;color:#c9c4d1;}
+  .mini button.on{background:var(--accent);color:#fff;font-weight:600;}
+  .slider{width:100%;}
+  .slabel{display:flex;justify-content:space-between;font-size:11.5px;color:#8b8798;margin-top:2px;}
+  .group{background:var(--panelelev);border-radius:14px;padding:12px 14px;margin:10px 0;}
+  .group h4{margin:0 0 2px;font-size:13px;color:#efe9dd;}
+  .divider{height:1px;background:var(--line);margin:14px 0;}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:26px;background:transparent;}
+  input[type=range]::-webkit-slider-runnable-track{height:4px;background:#4a4756;border-radius:2px;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);margin-top:-8px;}
+  input[type=range]::-moz-range-track{height:4px;background:#4a4756;border-radius:2px;}
+  input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-radius:50%;background:var(--accent);}
+  .switch{width:44px;height:26px;border-radius:13px;background:#4a4756;position:relative;transition:background .15s;}
+  .switch.on{background:var(--accent);}
+  .switch i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s;}
+  .switch.on i{left:21px;}
+  .muted{color:#8b8798;font-size:12px;line-height:1.5;}
+  .hidden{display:none !important;}
+  #toast{
+    position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+    background:#efe9dd;color:#23212b;padding:11px 18px;border-radius:12px;font-size:13.5px;
+    opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;
+  }
+  #toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME -->
+  <div id="home">
+    <h1>Painterly</h1>
+    <p class="sub">Break any reference into what to paint first.</p>
+    <button class="bigbtn" id="newPainting">+ &nbsp;New Painting</button>
+    <div class="homecard">
+      <h3>Browser test build</h3>
+      <p>This is a full port of the seven-stage painting pipeline and workspace so you can
+         tune it before the Android build is finalised. Everything runs locally in your browser.</p>
+      <ul>
+        <li>Draw · Block-In · Shadows · Lights · Form · Accents · Refine</li>
+        <li>Add vs Complete, Reference / Guide / Compare, drawing grid</li>
+        <li>Zoom, pan, double-tap zoom, export PNG</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- WORKSPACE -->
+  <div id="workspace">
+    <div id="toolbar">
+      <button class="tbtn" id="backBtn" title="Back">&#8592;</button>
+      <div class="title" id="projTitle">Painting</div>
+      <button class="tbtn" id="fitBtn" title="Fit">Fit</button>
+      <button class="tbtn" id="exportBtn" title="Export current view">Export</button>
+      <button class="tbtn" id="exportAllBtn" title="Export all stage guides">All</button>
+    </div>
+
+    <div id="stageArea">
+      <canvas id="view"></canvas>
+      <div class="overlay">
+        <div class="seg" id="viewSeg">
+          <button data-view="reference">Reference</button>
+          <button data-view="guide" class="on">Guide</button>
+          <button data-view="compare">Compare</button>
+        </div>
+        <div class="toolgroup">
+          <button id="gridToggle" title="Grid">&#9638;</button>
+        </div>
+      </div>
+      <div id="progressWrap"><div id="progressBar"></div></div>
+      <div id="busy"><div class="box"><div class="spinner"></div><span id="busyText">Building your painting guide…</span></div></div>
+      <div id="toast"></div>
+    </div>
+
+    <div id="panel" class="open">
+      <div id="panelHead">
+        <div class="q"><b id="stageName">DRAW</b><span id="stageQ">What do I need to draw before painting?</span></div>
+        <div id="chev">&#9660;</div>
+      </div>
+      <div id="panelBody">
+        <div id="stageStrip" class="strip"></div>
+        <div id="modeRow" class="row"><div class="lbl">View</div>
+          <div class="mini" id="modeSeg">
+            <button data-mode="add" class="on">Add</button>
+            <button data-mode="complete">Complete</button>
+          </div>
+        </div>
+        <div id="stageControls"></div>
+        <div id="compareRow" class="group hidden">
+          <h4>Compare with the reference</h4>
+          <input class="slider" id="compareSlider" type="range" min="0" max="100" value="60">
+          <div class="slabel"><span>Reference</span><span>Guide</span></div>
+        </div>
+        <div id="gridControls" class="group hidden">
+          <h4>Drawing grid</h4>
+          <div class="row"><div class="lbl">Rows</div>
+            <div class="mini"><button data-step="rows" data-dir="-1">-</button><span id="rowsVal" style="min-width:26px;text-align:center">3</span><button data-step="rows" data-dir="1">+</button></div>
+          </div>
+          <div class="row"><div class="lbl">Columns</div>
+            <div class="mini"><button data-step="cols" data-dir="-1">-</button><span id="colsVal" style="min-width:26px;text-align:center">4</span><button data-step="cols" data-dir="1">+</button></div>
+          </div>
+          <div class="row"><div class="lbl">Grid strength</div></div>
+          <input class="slider" id="gridOpacity" type="range" min="5" max="100" value="45">
+          <div class="row"><div class="lbl">Show cell labels</div><div class="switch" id="gridLabels"><i></i></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept="image/*" class="hidden">
+<div id="homeInputWrap"></div>
+
+<script>
+"use strict";
+/* ============================================================================
+   Painterly — browser test build.
+   Deterministic, local image processing. No AI, no network, no uploads.
+   Ports the same algorithms as the Android imaging pipeline.
+   ============================================================================ */
+
+/* ----------------------------- basic math --------------------------------- */
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const clamp01=v=>clamp(v,0,1);
+const lerp=(a,b,t)=>a+(b-a)*t;
+function smoothstep(e0,e1,x){ if(e0===e1) return x<e0?0:1; const t=clamp01((x-e0)/(e1-e0)); return t*t*(3-2*t); }
+const clamp255=v=>v<0?0:(v>255?255:v);
+const argb=(a,r,g,b)=>(((a<<24)|((r&255)<<16)|((g&255)<<8)|(b&255))>>>0);
+
+/* ----------------------------- blurring ----------------------------------- */
+function boxBlur(src,w,h,radius){
+  if(radius<=0) return src.slice();
+  const tmp=new Float32Array(src.length), out=new Float32Array(src.length);
+  const win=radius*2+1;
+  for(let y=0;y<h;y++){
+    const row=y*w; let sum=0;
+    for(let i=-radius;i<=radius;i++) sum+=src[row+clamp(i,0,w-1)];
+    for(let x=0;x<w;x++){
+      tmp[row+x]=sum/win;
+      sum+=src[row+clamp(x+radius+1,0,w-1)]-src[row+clamp(x-radius,0,w-1)];
+    }
+  }
+  for(let x=0;x<w;x++){
+    let sum=0;
+    for(let i=-radius;i<=radius;i++) sum+=tmp[clamp(i,0,h-1)*w+x];
+    for(let y=0;y<h;y++){
+      out[y*w+x]=sum/win;
+      sum+=tmp[clamp(y+radius+1,0,h-1)*w+x]-tmp[clamp(y-radius,0,h-1)*w+x];
+    }
+  }
+  return out;
+}
+function boxesForGauss(sigma,n){
+  const wIdeal=Math.sqrt((12*sigma*sigma/n)+1);
+  let wl=Math.floor(wIdeal); if(wl%2===0) wl--;
+  const wu=wl+2;
+  const mIdeal=(12*sigma*sigma-n*wl*wl-4*n*wl-3*n)/(-4*wl-4);
+  const m=Math.round(mIdeal);
+  const arr=[]; for(let i=0;i<n;i++) arr.push(i<m?wl:wu); return arr;
+}
+function gaussianBlur(src,w,h,sigma){
+  if(sigma<=0.01) return src.slice();
+  const boxes=boxesForGauss(sigma,3); let cur=src;
+  for(const b of boxes) cur=boxBlur(cur,w,h,Math.max(0,(b-1)>>1));
+  return cur;
+}
+function blurArgbRgb(data,w,h,sigma){
+  const n=w*h;
+  const r=new Float32Array(n),g=new Float32Array(n),b=new Float32Array(n);
+  for(let i=0;i<n;i++){ const o=i*4; r[i]=data[o]; g[i]=data[o+1]; b[i]=data[o+2]; }
+  return [gaussianBlur(r,w,h,sigma),gaussianBlur(g,w,h,sigma),gaussianBlur(b,w,h,sigma)];
+}
+
+/* ----------------------------- gradients ---------------------------------- */
+function gradient(g,w,h){
+  const gx=new Float32Array(g.length), gy=new Float32Array(g.length);
+  for(let y=1;y<h-1;y++){ const row=y*w;
+    for(let x=1;x<w-1;x++){ const i=row+x;
+      gx[i]=-g[i-w-1]-2*g[i-1]-g[i+w-1]+g[i-w+1]+2*g[i+1]+g[i+w+1];
+      gy[i]=-g[i-w-1]-2*g[i-w]-g[i-w+1]+g[i+w-1]+2*g[i+w]+g[i+w+1];
+    }
+  }
+  return [gx,gy];
+}
+function magnitude(gx,gy){
+  const m=new Float32Array(gx.length);
+  for(let i=0;i<m.length;i++) m[i]=Math.sqrt(gx[i]*gx[i]+gy[i]*gy[i]);
+  return m;
+}
+
+/* ----------------------------- morphology --------------------------------- */
+function dilate(mask,w,h,radius){
+  if(radius<=0) return mask.slice();
+  const tmp=new Uint8Array(mask.length);
+  for(let y=0;y<h;y++){ const row=y*w;
+    for(let x=0;x<w;x++){ let hit=0; const x0=Math.max(0,x-radius),x1=Math.min(w-1,x+radius);
+      for(let xx=x0;xx<=x1;xx++){ if(mask[row+xx]){hit=1;break;} } tmp[row+x]=hit; } }
+  const out=new Uint8Array(mask.length);
+  for(let x=0;x<w;x++){
+    for(let y=0;y<h;y++){ let hit=0; const y0=Math.max(0,y-radius),y1=Math.min(h-1,y+radius);
+      for(let yy=y0;yy<=y1;yy++){ if(tmp[yy*w+x]){hit=1;break;} } out[y*w+x]=hit; } }
+  return out;
+}
+function erode(mask,w,h,radius){
+  if(radius<=0) return mask.slice();
+  const tmp=new Uint8Array(mask.length);
+  for(let y=0;y<h;y++){ const row=y*w;
+    for(let x=0;x<w;x++){ let keep=1; const x0=Math.max(0,x-radius),x1=Math.min(w-1,x+radius);
+      for(let xx=x0;xx<=x1;xx++){ if(!mask[row+xx]){keep=0;break;} } tmp[row+x]=keep; } }
+  const out=new Uint8Array(mask.length);
+  for(let x=0;x<w;x++){
+    for(let y=0;y<h;y++){ let keep=1; const y0=Math.max(0,y-radius),y1=Math.min(h-1,y+radius);
+      for(let yy=y0;yy<=y1;yy++){ if(!tmp[yy*w+x]){keep=0;break;} } out[y*w+x]=keep; } }
+  return out;
+}
+function openClose(mask,w,h,radius){
+  if(radius<=0) return mask;
+  let m=erode(mask,w,h,radius); m=dilate(m,w,h,radius);
+  m=dilate(m,w,h,radius); m=erode(m,w,h,radius); return m;
+}
+function keepComponents(mask,w,h,keep){
+  const visited=new Uint8Array(mask.length); const stack=[];
+  for(let s=0;s<mask.length;s++){
+    if(!mask[s]||visited[s]) continue;
+    stack.length=0; stack.push(s); visited[s]=1; const comp=[];
+    while(stack.length){
+      const i=stack.pop(); comp.push(i); const x=i%w,y=(i/w)|0;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        if(!dx&&!dy) continue;
+        const nx=x+dx,ny=y+dy;
+        if(nx>=0&&nx<w&&ny>=0&&ny<h){ const j=ny*w+nx;
+          if(mask[j]&&!visited[j]){ visited[j]=1; stack.push(j); } }
+      }
+    }
+    if(!keep(comp.length)) for(let k=0;k<comp.length;k++) mask[comp[k]]=0;
+  }
+}
+const removeSmallComponents=(m,w,h,min)=>keepComponents(m,w,h,n=>n>=min);
+const removeLargeComponents=(m,w,h,max)=>keepComponents(m,w,h,n=>n<=max);
+function cleanMask(mask,w,h,radius,minComponent){
+  let m=erode(mask,w,h,radius); m=dilate(m,w,h,radius);
+  removeSmallComponents(m,w,h,minComponent);
+  m=dilate(m,w,h,radius); m=erode(m,w,h,radius); return m;
+}
+
+/* --------------------------- canny edges ---------------------------------- */
+function cannyEdges(g,w,h,low,high,minComponent){
+  const [gx,gy]=gradient(g,w,h); const mag=magnitude(gx,gy);
+  const sup=new Float32Array(g.length);
+  for(let y=1;y<h-1;y++){ const row=y*w;
+    for(let x=1;x<w-1;x++){ const i=row+x; const m=mag[i]; if(m<=0) continue;
+      let ang=Math.atan2(gy[i],gx[i])*180/Math.PI; if(ang<0) ang+=180;
+      let n1,n2;
+      if(ang<22.5||ang>=157.5){n1=mag[i-1];n2=mag[i+1];}
+      else if(ang<67.5){n1=mag[i-w+1];n2=mag[i+w-1];}
+      else if(ang<112.5){n1=mag[i-w];n2=mag[i+w];}
+      else {n1=mag[i-w-1];n2=mag[i+w+1];}
+      sup[i]=(m>=n1&&m>=n2)?m:0;
+    }
+  }
+  const edge=new Uint8Array(g.length); const weak=new Uint8Array(g.length); const stack=[];
+  for(let i=0;i<g.length;i++){ if(sup[i]>=high){edge[i]=1; stack.push(i);} weak[i]=sup[i]>=low?1:0; }
+  while(stack.length){
+    const i=stack.pop(); const x=i%w,y=(i/w)|0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      if(!dx&&!dy) continue; const nx=x+dx,ny=y+dy;
+      if(nx>0&&nx<w-1&&ny>0&&ny<h-1){ const j=ny*w+nx; if(weak[j]&&!edge[j]){edge[j]=1; stack.push(j);} }
+    }
+  }
+  if(minComponent>1) removeSmallComponents(edge,w,h,minComponent);
+  return edge;
+}
+
+/* ----------------------------- colour ------------------------------------- */
+function sampleRgb(data,w,h,maxDim){
+  const step=Math.max(1,Math.floor(Math.max(w,h)/maxDim));
+  const r=[],g=[],b=[];
+  for(let y=0;y<h;y+=step)for(let x=0;x<w;x+=step){ const o=(y*w+x)*4; r.push(data[o]); g.push(data[o+1]); b.push(data[o+2]); }
+  return [r,g,b];
+}
+function kMeansPalette(data,w,h,k,iterations){
+  const [sr,sg,sb]=sampleRgb(data,w,h,220); const n=sr.length;
+  const lum=new Float32Array(n); for(let i=0;i<n;i++) lum[i]=0.2126*sr[i]+0.7152*sg[i]+0.0722*sb[i];
+  const order=Array.from({length:n},(_,i)=>i).sort((a,b)=>lum[a]-lum[b]);
+  const centers=[];
+  for(let c=0;c<k;c++){ const idx=order[Math.min(n-1,Math.floor((c+0.5)/k*n))]; centers.push([sr[idx],sg[idx],sb[idx]]); }
+  for(let it=0;it<iterations;it++){
+    const sum=Array.from({length:k},()=>[0,0,0]); const cnt=new Int32Array(k);
+    for(let p=0;p<n;p++){
+      let best=0,bd=Infinity;
+      for(let c=0;c<k;c++){ const dr=sr[p]-centers[c][0],dg=sg[p]-centers[c][1],db=sb[p]-centers[c][2];
+        const d=dr*dr+dg*dg+db*db; if(d<bd){bd=d;best=c;} }
+      sum[best][0]+=sr[p]; sum[best][1]+=sg[p]; sum[best][2]+=sb[p]; cnt[best]++;
+    }
+    for(let c=0;c<k;c++){ if(cnt[c]>0){ centers[c][0]=sum[c][0]/cnt[c]; centers[c][1]=sum[c][1]/cnt[c]; centers[c][2]=sum[c][2]/cnt[c]; } }
+  }
+  centers.sort((a,b)=>(0.2126*a[0]+0.7152*a[1]+0.0722*a[2])-(0.2126*b[0]+0.7152*b[1]+0.0722*b[2]));
+  return centers;
+}
+function assignPalette(data,w,h,palette){
+  const n=w*h; const out=new Int32Array(n); const k=palette.length;
+  for(let i=0;i<n;i++){
+    const o=i*4, r=data[o], g=data[o+1], b=data[o+2];
+    let best=0,bd=Infinity;
+    for(let p=0;p<k;p++){ const dr=r-palette[p][0],dg=g-palette[p][1],db=b-palette[p][2];
+      const d=dr*dr+dg*dg+db*db; if(d<bd){bd=d;best=p;} }
+    out[i]=best;
+  }
+  return out;
+}
+function modeFilterLabels(labels,w,h,k,passes){
+  let cur=labels;
+  const counts=new Int32Array(k);
+  for(let pass=0;pass<passes;pass++){
+    const next=new Int32Array(cur.length);
+    for(let y=0;y<h;y++){ for(let x=0;x<w;x++){
+      counts.fill(0);
+      for(let dy=-1;dy<=1;dy++){ const ny=clamp(y+dy,0,h-1);
+        for(let dx=-1;dx<=1;dx++){ const nx=clamp(x+dx,0,w-1); counts[cur[ny*w+nx]]++; } }
+      let best=0,bc=-1; for(let c=0;c<k;c++){ if(counts[c]>bc){bc=counts[c];best=c;} }
+      next[y*w+x]=best;
+    }}
+    cur=next;
+  }
+  return cur;
+}
+function percentileValue(values,fraction){
+  const hist=new Int32Array(256); let total=0;
+  for(let i=0;i<values.length;i++){ const b=clamp(Math.round(values[i]),0,255); hist[b]++; total++; }
+  if(!total) return 0;
+  const target=Math.floor(total*clamp(fraction,0,1)); let acc=0;
+  for(let b=0;b<256;b++){ acc+=hist[b]; if(acc>=target) return b; }
+  return 255;
+}
+
+/* ----------------------------- helpers ------------------------------------ */
+function shade(r,g,b,factor,cool){ return [clamp255(r*factor),clamp255(g*(factor-cool*0.15)),clamp255(b*(factor+cool))]; }
+function mixWhite(r,g,b,t){ t=clamp01(t); return [clamp255(r+(255-r)*t),clamp255(g+(255-g)*t),clamp255(b+(255-b)*t)]; }
+function makeRgba(w,h){
+  return { w,h, d:new Uint8ClampedArray(w*h*4), set(i, rgb, a){ this.d[i*4]=rgb[0]; this.d[i*4+1]=rgb[1]; this.d[i*4+2]=rgb[2]; this.d[i*4+3]=a; } };
+}
+function toImageData(layer){ return new ImageData(new Uint8ClampedArray(layer.d), layer.w, layer.h); }
+
+/* ============================== PIPELINE ================================== */
+const STAGE_IDS=["DRAW","BLOCK_IN","SHADOWS","LIGHTS","FORM","ACCENTS","REFINE"];
+const STAGE_META={
+  DRAW:{label:"Draw", q:"What do I need to draw before painting?"},
+  BLOCK_IN:{label:"Block-In", q:"What are the largest masses I put down first?"},
+  SHADOWS:{label:"Shadows", q:"What dark information do I add next?"},
+  LIGHTS:{label:"Lights", q:"What major light shapes do I add next?"},
+  FORM:{label:"Form", q:"Where do the major forms begin to turn?"},
+  ACCENTS:{label:"Accents", q:"What small information brings the painting forward?"},
+  REFINE:{label:"Refine", q:"Where should I spend my time refining?"}
+};
+
+function computeShared(imageData,k){
+  const w=imageData.width,h=imageData.height; const data=imageData.data; const n=w*h;
+  const rawGray=new Float32Array(n);
+  for(let i=0;i<n;i++){ const o=i*4; rawGray[i]=0.2126*data[o]+0.7152*data[o+1]+0.0722*data[o+2]; }
+  const structuralSigma=clamp(Math.min(w,h)*0.006,1.2,4);
+  const gray=gaussianBlur(rawGray,w,h,structuralSigma);
+  const regionalSigma=clamp(Math.min(w,h)*0.014,2.5,9);
+  const [sr,sg,sb]=blurArgbRgb(data,w,h,regionalSigma);
+  const smooth=new Uint8ClampedArray(n*4);
+  for(let i=0;i<n;i++){ smooth[i*4]=sr[i]; smooth[i*4+1]=sg[i]; smooth[i*4+2]=sb[i]; smooth[i*4+3]=255; }
+  const palette=kMeansPalette(smooth,w,h,k,8);
+  let labels=assignPalette(smooth,w,h,palette);
+  labels=modeFilterLabels(labels,w,h,palette.length,2);
+  const palettePacked=palette.map(c=>argb(255,Math.round(c[0]),Math.round(c[1]),Math.round(c[2])));
+  const blockPixels=new Uint32Array(n);
+  for(let i=0;i<n;i++) blockPixels[i]=palettePacked[labels[i]];
+  return { w,h,rawGray,gray,labels,blockPixels };
+}
+
+function stageDraw(sh,s){
+  const {w,h,rawGray}=sh;
+  const scale=clamp(Math.min(w,h)/1000,1,2.5);
+  const detail=s.drawDetail;
+  const sigma=lerp(2.6,0.85,detail)*scale;
+  const blur=gaussianBlur(rawGray,w,h,sigma);
+  const high=lerp(46,14,detail), low=high*0.4;
+  const minC=Math.max(1,Math.round(lerp(Math.max(40,Math.min(w,h)*0.02),Math.max(6,Math.min(w,h)*0.002),detail)));
+  let edges=cannyEdges(blur,w,h,low,high,minC);
+  const lr=Math.max(0,Math.floor(Math.min(w,h)/900));
+  if(lr>0) edges=dilate(edges,w,h,lr);
+  const L=makeRgba(w,h);
+  for(let i=0;i<w*h;i++) if(edges[i]) L.set(i,[42,40,48],255);
+  return toImageData(L);
+}
+function stageBlockIn(sh){
+  const {w,h,blockPixels}=sh; const L=makeRgba(w,h);
+  for(let i=0;i<w*h;i++){ const c=blockPixels[i]; L.set(i,[(c>>>16)&255,(c>>>8)&255,c&255],255); }
+  return toImageData(L);
+}
+function stageShadows(sh,s){
+  const {w,h,gray,blockPixels}=sh; const amount=s.shadowAmount;
+  const radius=Math.max(3,Math.round(Math.min(w,h)*0.05));
+  const localMean=boxBlur(gray,w,h,radius);
+  const relT=lerp(26,6,amount), absT=percentileValue(gray,lerp(0.10,0.34,amount));
+  let mask=new Uint8Array(w*h);
+  for(let i=0;i<mask.length;i++) mask[i]=((localMean[i]-gray[i]>relT)||(gray[i]<absT))?1:0;
+  mask=cleanMask(mask,w,h,Math.max(1,Math.floor(Math.min(w,h)/260)),Math.max(30,Math.floor(w*h/6000)));
+  const darken=lerp(0.62,0.40,amount); const L=makeRgba(w,h);
+  for(let i=0;i<w*h;i++) if(mask[i]){ const c=blockPixels[i]; L.set(i,shade((c>>>16)&255,(c>>>8)&255,c&255,darken,0.14),255); }
+  return toImageData(L);
+}
+function stageLights(sh,s){
+  const {w,h,gray,blockPixels}=sh; const amount=s.lightAmount;
+  const radius=Math.max(3,Math.round(Math.min(w,h)*0.05));
+  const localMean=boxBlur(gray,w,h,radius);
+  const relT=lerp(30,8,amount), absT=percentileValue(gray,lerp(0.90,0.66,amount));
+  let mask=new Uint8Array(w*h);
+  for(let i=0;i<mask.length;i++) mask[i]=((gray[i]-localMean[i]>relT)||(gray[i]>absT))?1:0;
+  mask=cleanMask(mask,w,h,Math.max(1,Math.floor(Math.min(w,h)/260)),Math.max(30,Math.floor(w*h/6000)));
+  const lighten=lerp(0.30,0.55,amount); const L=makeRgba(w,h);
+  for(let i=0;i<w*h;i++) if(mask[i]){ const c=blockPixels[i]; L.set(i,mixWhite((c>>>16)&255,(c>>>8)&255,c&255,lighten),255); }
+  return toImageData(L);
+}
+function stageForm(sh,s){
+  const {w,h,gray,blockPixels}=sh; const amount=s.formAmount;
+  const s1=clamp(Math.min(w,h)*0.012,2,6);
+  const near=gaussianBlur(gray,w,h,s1), far=gaussianBlur(gray,w,h,s1*2.6);
+  const signed=new Float32Array(gray.length), absv=new Float32Array(gray.length);
+  for(let i=0;i<gray.length;i++){
+    const lum=clamp01(gray[i]/255); const mid=clamp01(1-Math.abs(lum-0.5)*2);
+    signed[i]=(near[i]-far[i])*mid; absv[i]=Math.abs(signed[i]);
+  }
+  const threshold=percentileValue(absv,lerp(0.90,0.55,amount));
+  const L=makeRgba(w,h);
+  if(threshold<=0.5) return toImageData(L);
+  for(let i=0;i<w*h;i++){
+    const v=signed[i]; if(Math.abs(v)<threshold) continue;
+    const alpha=smoothstep(threshold,threshold*2.6,Math.abs(v));
+    const a=Math.round(clamp01(alpha)*255);
+    const c=blockPixels[i];
+    const rgb = v<0
+      ? shade((c>>>16)&255,(c>>>8)&255,c&255,1-0.20*alpha,0.05*alpha)
+      : mixWhite((c>>>16)&255,(c>>>8)&255,c&255,0.16*alpha);
+    L.set(i,rgb,a);
+  }
+  return toImageData(L);
+}
+function stageAccents(sh,s){
+  const {w,h,gray,blockPixels}=sh; const amount=s.accentAmount;
+  const radius=Math.max(2,Math.round(Math.min(w,h)*0.02));
+  const local=boxBlur(gray,w,h,radius);
+  const threshold=lerp(44,14,amount);
+  let mask=new Uint8Array(w*h);
+  for(let i=0;i<mask.length;i++) mask[i]=(gray[i]-local[i]>threshold && gray[i]>150)?1:0;
+  const morph=Math.max(1,Math.floor(Math.min(w,h)/300));
+  mask=openClose(mask,w,h,morph);
+  removeLargeComponents(mask,w,h,Math.max(140,Math.floor(w*h/1200)));
+  removeSmallComponents(mask,w,h,Math.max(2,Math.floor(w*h/400000)));
+  const L=makeRgba(w,h);
+  for(let i=0;i<w*h;i++) if(mask[i]){ const c=blockPixels[i]; L.set(i,mixWhite((c>>>16)&255,(c>>>8)&255,c&255,0.80),255); }
+  return toImageData(L);
+}
+function stageRefineEdges(sh,s){
+  const {w,h,gray,labels}=sh; const amount=s.refineAmount;
+  const smooth=gaussianBlur(gray,w,h,clamp(Math.min(w,h)*0.004,1,2.5));
+  const [gx,gy]=gradient(smooth,w,h); const mag=magnitude(gx,gy);
+  const high=percentileValue(mag,lerp(0.985,0.94,amount));
+  const softCut=high*0.5, lostCut=high*0.35;
+  const hard=new Uint8Array(w*h), soft=new Uint8Array(w*h), lost=new Uint8Array(w*h);
+  for(let y=1;y<h-1;y++){ for(let x=1;x<w-1;x++){ const i=y*w+x; const m=mag[i];
+    if(m>=high) hard[i]=1; else if(m>=softCut) soft[i]=1;
+    else { const lab=labels[i]; if((lab!==labels[i+1]||lab!==labels[i+w])&&m<lostCut) lost[i]=1; }
+  }}
+  const radius=Math.max(0,Math.floor(Math.min(w,h)/1200));
+  const hardR=radius>0?dilate(hard,w,h,radius):hard;
+  const softR=radius>0?dilate(soft,w,h,radius):soft;
+  const L=makeRgba(w,h);
+  for(let i=0;i<w*h;i++){
+    if(hardR[i]) L.set(i,[226,59,46],255);
+    else if(softR[i]) L.set(i,[240,169,59],255);
+    else if(lost[i]) L.set(i,[138,138,138],77);
+  }
+  return toImageData(L);
+}
+function stageRefineDetail(sh,s){
+  const {w,h,gray}=sh; const amount=s.refineAmount;
+  const fine=gaussianBlur(gray,w,h,1.4);
+  const hf=new Float32Array(gray.length);
+  for(let i=0;i<gray.length;i++) hf[i]=Math.abs(gray[i]-fine[i]);
+  const score=gaussianBlur(hf,w,h,clamp(Math.min(w,h)*0.012,2,7));
+  const highCut=percentileValue(score,lerp(0.90,0.72,amount));
+  const lowCut=percentileValue(score,lerp(0.6,0.35,amount));
+  const L=makeRgba(w,h);
+  for(let i=0;i<w*h;i++){
+    if(score[i]>=highCut) L.set(i,[232,115,74],153);
+    else if(score[i]>=lowCut) L.set(i,[224,184,74],102);
+    else L.set(i,[74,125,224],64);
+  }
+  return toImageData(L);
+}
+function generateStage(id,sh,s){
+  switch(id){
+    case "DRAW": return stageDraw(sh,s);
+    case "BLOCK_IN": return stageBlockIn(sh);
+    case "SHADOWS": return stageShadows(sh,s);
+    case "LIGHTS": return stageLights(sh,s);
+    case "FORM": return stageForm(sh,s);
+    case "ACCENTS": return stageAccents(sh,s);
+    case "REFINE": return s.refineView==="edges"?stageRefineEdges(sh,s):stageRefineDetail(sh,s);
+  }
+  return null;
+}
+
+/* ============================== APP STATE ================================= */
+const PREVIEW_MAX=1000;
+const settings={ drawDetail:0.5, blockInValues:4, shadowAmount:0.5, lightAmount:0.5,
+                 formAmount:0.5, accentAmount:0.5, refineView:"edges", refineAmount:0.5 };
+const grid={ enabled:false, rows:3, cols:4, opacity:0.45, labels:false };
+let stage="DRAW", mode="add", view="guide", compareOpacity=0.6;
+let preview=null, refCanvas=null, imgW=0, imgH=0;
+let shared=null; const layers={}; const layerCanvas={};
+let scale=1, tx=0, ty=0;
+let genToken=0, currentFileName="reference";
+
+const $=id=>document.getElementById(id);
+const tick=()=>new Promise(r=>setTimeout(r,0));
+
+function depKey(id,s){
+  switch(id){
+    case "DRAW": return "d="+s.drawDetail.toFixed(3);
+    case "BLOCK_IN": return "b="+s.blockInValues;
+    case "SHADOWS": return "b="+s.blockInValues+";s="+s.shadowAmount.toFixed(3);
+    case "LIGHTS": return "b="+s.blockInValues+";l="+s.lightAmount.toFixed(3);
+    case "FORM": return "b="+s.blockInValues+";f="+s.formAmount.toFixed(3);
+    case "ACCENTS": return "b="+s.blockInValues+";a="+s.accentAmount.toFixed(3);
+    case "REFINE": return "b="+s.blockInValues+";v="+s.refineView+";r="+s.refineAmount.toFixed(3);
+  }
+  return "";
+}
+const lastKeys={};
+
+function rebuildLayerCanvas(id){
+  if(!layers[id]) return;
+  let c=layerCanvas[id];
+  if(!c){ c=document.createElement("canvas"); layerCanvas[id]=c; }
+  c.width=layers[id].width; c.height=layers[id].height;
+  c.getContext("2d").putImageData(layers[id],0,0);
+}
+
+function setBusy(on,text){ $("busy").style.display=on?"flex":"none"; if(text) $("busyText").textContent=text; }
+function setProgress(p){ $("progressWrap").style.display=p<1?"block":"none"; $("progressBar").style.width=Math.round(p*100)+"%"; }
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
+
+async function generateAll(){
+  const token=++genToken;
+  setBusy(true,"Building your painting guide…");
+  setProgress(0);
+  await tick();
+  try{
+    shared=computeShared(preview, settings.blockInValues);
+    for(let i=0;i<STAGE_IDS.length;i++){
+      if(token!==genToken) return;
+      const id=STAGE_IDS[i];
+      layers[id]=generateStage(id,shared,settings);
+      rebuildLayerCanvas(id);
+      lastKeys[id]=depKey(id,settings);
+      setProgress((i+1)/STAGE_IDS.length);
+      await tick();
+    }
+    setProgress(1);
+    draw();
+  } finally {
+    if(token===genToken) setBusy(false);
+  }
+}
+
+async function regenerate(changed){
+  const token=++genToken;
+  setProgress(0);
+  await tick();
+  try{
+    if(changed.includes("BLOCK_IN")||!shared){
+      shared=computeShared(preview,settings.blockInValues);
+    }
+    for(let i=0;i<changed.length;i++){
+      if(token!==genToken) return;
+      const id=changed[i];
+      layers[id]=generateStage(id,shared,settings);
+      rebuildLayerCanvas(id);
+      lastKeys[id]=depKey(id,settings);
+      setProgress((i+1)/changed.length);
+      await tick();
+    }
+    setProgress(1);
+    draw();
+  } finally {
+    if(token===genToken) setProgress(1);
+  }
+}
+
+let regenTimer=null;
+function applySettings(patch){
+  const old={...settings};
+  Object.assign(settings,patch);
+  const structural=("blockInValues" in patch)||("refineView" in patch);
+  if(structural) renderStageControls();
+  const changed=STAGE_IDS.filter(id=>depKey(id,old)!==depKey(id,settings));
+  draw();
+  if(changed.length){
+    clearTimeout(regenTimer);
+    regenTimer=setTimeout(()=>regenerate(changed),180);
+  }
+}
+
+/* ============================== LOADING =================================== */
+function loadFile(file){
+  if(!file) return;
+  currentFileName=file.name.replace(/\.[^.]+$/,"")||"reference";
+  const url=URL.createObjectURL(file);
+  const img=new Image();
+  img.onload=()=>{
+    URL.revokeObjectURL(url);
+    const ratio=Math.min(1,PREVIEW_MAX/Math.max(img.width,img.height));
+    const w=Math.max(1,Math.round(img.width*ratio)), h=Math.max(1,Math.round(img.height*ratio));
+    const c=document.createElement("canvas"); c.width=w; c.height=h;
+    const ctx=c.getContext("2d",{willReadFrequently:true});
+    ctx.drawImage(img,0,0,w,h);
+    preview=ctx.getImageData(0,0,w,h);
+    imgW=w; imgH=h;
+    refCanvas=c;
+    scale=1; tx=0; ty=0;
+    $("projTitle").textContent=currentFileName;
+    $("home").style.display="none";
+    $("workspace").style.display="flex";
+    resizeCanvas();
+    renderStageStrip(); renderStageControls(); updateStageHeader(); syncModeButtons(); syncViewButtons();
+    generateAll();
+  };
+  img.onerror=()=>{ URL.revokeObjectURL(url); toast("That image couldn't be opened."); };
+  img.src=url;
+}
+
+/* ============================== RENDER ==================================== */
+const canvas=$("view"), ctx=canvas.getContext("2d");
+let cssW=0,cssH=0,dpr=1;
+
+function resizeCanvas(){
+  dpr=window.devicePixelRatio||1;
+  cssW=canvas.clientWidth; cssH=canvas.clientHeight;
+  canvas.width=Math.max(1,Math.round(cssW*dpr));
+  canvas.height=Math.max(1,Math.round(cssH*dpr));
+  draw();
+}
+function fitSize(){
+  const aspect=imgW/imgH;
+  let fw,fh;
+  if(cssW/cssH>aspect){ fh=cssH; fw=fh*aspect; } else { fw=cssW; fh=fw/aspect; }
+  return [fw,fh];
+}
+function clampPan(){
+  const [fw,fh]=fitSize();
+  const maxX=Math.max(0,(fw*scale-cssW)/2), maxY=Math.max(0,(fh*scale-cssH)/2);
+  tx=clamp(tx,-maxX,maxX); ty=clamp(ty,-maxY,maxY);
+}
+function stagesUpTo(id){
+  const end=STAGE_IDS.indexOf(id); const out=[];
+  for(let i=0;i<=end;i++) if(layerCanvas[STAGE_IDS[i]]) out.push(STAGE_IDS[i]);
+  return out;
+}
+function draw(){
+  if(!preview){ ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,canvas.width,canvas.height); return; }
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,cssW,cssH);
+  ctx.fillStyle="#0f0e12"; ctx.fillRect(0,0,cssW,cssH);
+  const [fw,fh]=fitSize();
+  ctx.save();
+  ctx.translate(cssW/2+tx, cssH/2+ty);
+  ctx.scale(scale,scale);
+  ctx.translate(-fw/2,-fh/2);
+  ctx.fillStyle="#f4eee3"; ctx.fillRect(0,0,fw,fh);
+  if(view==="reference"||view==="compare") ctx.drawImage(refCanvas,0,0,fw,fh);
+  if(view!=="reference"){
+    const alpha=(view==="compare")?compareOpacity:1;
+    const list=(mode==="add")?[stage]:stagesUpTo(stage);
+    ctx.globalAlpha=alpha;
+    for(const id of list){ const c=layerCanvas[id]; if(c) ctx.drawImage(c,0,0,fw,fh); }
+    ctx.globalAlpha=1;
+  }
+  if(grid.enabled) drawGrid(fw,fh);
+  ctx.restore();
+}
+function drawGrid(fw,fh){
+  ctx.save();
+  ctx.strokeStyle="rgba(26,24,32,"+grid.opacity+")";
+  ctx.fillStyle="rgba(26,24,32,"+grid.opacity+")";
+  ctx.lineWidth=Math.max(0.5,1/scale);
+  ctx.font=(Math.max(9,Math.min(fw,fh)*0.03/scale))+"px -apple-system,Segoe UI,Roboto,sans-serif";
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  for(let c=1;c<grid.cols;c++){ const x=fw*c/grid.cols; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,fh); ctx.stroke(); }
+  for(let r=1;r<grid.rows;r++){ const y=fh*r/grid.rows; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(fw,y); ctx.stroke(); }
+  if(grid.labels){
+    const fs=Math.max(9,Math.min(fw,fh)*0.03/scale);
+    ctx.font=fs+"px -apple-system,Segoe UI,Roboto,sans-serif";
+    for(let r=0;r<grid.rows;r++)for(let c=0;c<grid.cols;c++){
+      const cx=fw*(c+0.5)/grid.cols, cy=fh*(r+0.5)/grid.rows;
+      ctx.fillText(String.fromCharCode(65+c)+(r+1),cx,cy);
+    }
+  }
+  ctx.restore();
+}
+
+/* ============================== GESTURES ================================== */
+let pointers=new Map(), dragging=false, lastX=0, lastY=0, pinchDist=0, pinchMid=null;
+canvas.addEventListener("wheel",e=>{
+  if(!preview) return; e.preventDefault();
+  const rect=canvas.getBoundingClientRect();
+  const px=e.clientX-rect.left, py=e.clientY-rect.top;
+  const factor=Math.exp(-e.deltaY*0.0016);
+  const ns=clamp(scale*factor,1,8); const k=ns/scale;
+  tx=(px-cssW/2)*(1-k)+tx*k; ty=(py-cssH/2)*(1-k)+ty*k;
+  scale=ns; clampPan(); draw();
+},{passive:false});
+canvas.addEventListener("pointerdown",e=>{
+  canvas.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pointers.size===1){ dragging=true; lastX=e.clientX; lastY=e.clientY; }
+  if(pointers.size===2){ dragging=false; const p=[...pointers.values()]; pinchDist=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y); pinchMid={x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2}; }
+});
+canvas.addEventListener("pointermove",e=>{
+  if(!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pointers.size===1&&dragging){
+    tx+=e.clientX-lastX; ty+=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY; clampPan(); draw();
+  } else if(pointers.size===2){
+    const p=[...pointers.values()]; const d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);
+    const rect=canvas.getBoundingClientRect();
+    const mid={x:(p[0].x+p[1].x)/2-rect.left,y:(p[0].y+p[1].y)/2-rect.top};
+    if(pinchDist>0){
+      const factor=d/pinchDist; const ns=clamp(scale*factor,1,8); const k=ns/scale;
+      tx=(mid.x-cssW/2)*(1-k)+tx*k; ty=(mid.y-cssH/2)*(1-k)+ty*k; scale=ns;
+    }
+    pinchDist=d; pinchMid=mid; clampPan(); draw();
+  }
+});
+function endPointer(e){ pointers.delete(e.pointerId); if(pointers.size===0){dragging=false;} if(pointers.size<2){pinchDist=0;} }
+canvas.addEventListener("pointerup",endPointer);
+canvas.addEventListener("pointercancel",endPointer);
+canvas.addEventListener("dblclick",e=>{
+  if(!preview) return;
+  const rect=canvas.getBoundingClientRect(); const px=e.clientX-rect.left, py=e.clientY-rect.top;
+  if(scale>1.05){ scale=1; tx=0; ty=0; }
+  else { const ns=2.6; const k=ns/scale; tx=(px-cssW/2)*(1-k)+tx*k; ty=(py-cssH/2)*(1-k)+ty*k; scale=ns; }
+  clampPan(); draw();
+});
+window.addEventListener("resize",resizeCanvas);
+
+/* ============================== CONTROLS ================================== */
+function renderStageStrip(){
+  const el=$("stageStrip"); el.innerHTML="";
+  STAGE_IDS.forEach((id,i)=>{
+    const b=document.createElement("button");
+    b.className=(id===stage)?"on":"";
+    b.innerHTML='<span class="n">'+(i+1)+'</span><span class="l">'+STAGE_META[id].label.toUpperCase()+'</span>';
+    b.onclick=()=>{ stage=id; updateStageHeader(); renderStageStrip(); renderStageControls(); draw(); };
+    el.appendChild(b);
+  });
+}
+function updateStageHeader(){ $("stageName").textContent=STAGE_META[stage].label.toUpperCase(); $("stageQ").textContent=STAGE_META[stage].q; $("modeRow").style.display=(stage==="DRAW")?"none":"flex"; }
+function slider(title,left,right,value,onInput){
+  const g=document.createElement("div"); g.className="group";
+  g.innerHTML='<h4>'+title+'</h4>';
+  const inp=document.createElement("input"); inp.type="range"; inp.className="slider"; inp.min="0"; inp.max="100"; inp.value=Math.round(value*100);
+  inp.oninput=()=>onInput(inp.value/100);
+  const sl=document.createElement("div"); sl.className="slabel"; sl.innerHTML="<span>"+left+"</span><span>"+right+"</span>";
+  g.appendChild(inp); g.appendChild(sl); return g;
+}
+function renderStageControls(){
+  const el=$("stageControls"); el.innerHTML="";
+  if(stage==="DRAW") el.appendChild(slider("Amount of structure","Simpler","More detailed",settings.drawDetail,v=>applySettings({drawDetail:v})));
+  else if(stage==="BLOCK_IN"){
+    const g=document.createElement("div"); g.className="group"; g.innerHTML="<h4>How many value families?</h4>";
+    const m=document.createElement("div"); m.className="mini"; m.style.marginTop="8px";
+    [3,4].forEach(k=>{ const b=document.createElement("button"); b.textContent=k+" VALUES"; b.className=(settings.blockInValues===k)?"on":"";
+      b.onclick=()=>applySettings({blockInValues:k}); m.appendChild(b); });
+    g.appendChild(m); el.appendChild(g);
+  }
+  else if(stage==="SHADOWS") el.appendChild(slider("Shadow masses","Less shadow","More shadow",settings.shadowAmount,v=>applySettings({shadowAmount:v})));
+  else if(stage==="LIGHTS") el.appendChild(slider("Light shapes","Simpler","More complete",settings.lightAmount,v=>applySettings({lightAmount:v})));
+  else if(stage==="FORM") el.appendChild(slider("Turning form","Less form","More form",settings.formAmount,v=>applySettings({formAmount:v})));
+  else if(stage==="ACCENTS") el.appendChild(slider("Accents","Fewer accents","More accents",settings.accentAmount,v=>applySettings({accentAmount:v})));
+  else if(stage==="REFINE"){
+    const g=document.createElement("div"); g.className="group"; g.innerHTML="<h4>Refinement view</h4>";
+    const m=document.createElement("div"); m.className="mini"; m.style.marginTop="8px";
+    [["edges","Edges"],["detail","Detail"]].forEach(([v,l])=>{ const b=document.createElement("button"); b.textContent=l; b.className=(settings.refineView===v)?"on":"";
+      b.onclick=()=>applySettings({refineView:v}); m.appendChild(b); });
+    g.appendChild(m); el.appendChild(g);
+    el.appendChild(slider(settings.refineView==="edges"?"Edge emphasis":"Detail priority","Fewer notes","More notes",settings.refineAmount,v=>applySettings({refineAmount:v})));
+  }
+}
+function syncModeButtons(){ [...document.querySelectorAll("#modeSeg button")].forEach(b=>b.classList.toggle("on",b.dataset.mode===mode)); }
+function syncViewButtons(){ [...document.querySelectorAll("#viewSeg button")].forEach(b=>b.classList.toggle("on",b.dataset.view===view)); }
+
+[...document.querySelectorAll("#modeSeg button")].forEach(b=>b.onclick=()=>{ mode=b.dataset.mode; syncModeButtons(); draw(); });
+[...document.querySelectorAll("#viewSeg button")].forEach(b=>b.onclick=()=>{ view=b.dataset.view; syncViewButtons(); $("compareRow").classList.toggle("hidden",view!=="compare"); draw(); });
+$("compareSlider").oninput=e=>{ compareOpacity=e.target.value/100; draw(); };
+$("panelHead").onclick=()=>$("panel").classList.toggle("open");
+
+$("gridToggle").onclick=()=>{ grid.enabled=!grid.enabled; $("gridToggle").classList.toggle("on",grid.enabled); $("gridControls").classList.toggle("hidden",!grid.enabled); draw(); };
+[...document.querySelectorAll("[data-step]")].forEach(b=>b.onclick=()=>{
+  const which=b.dataset.step, dir=parseInt(b.dataset.dir,10);
+  if(which==="rows") grid.rows=clamp(grid.rows+dir,1,12);
+  else grid.cols=clamp(grid.cols+dir,1,12);
+  $("rowsVal").textContent=grid.rows; $("colsVal").textContent=grid.cols; draw();
+});
+$("gridOpacity").oninput=e=>{ grid.opacity=e.target.value/100; draw(); };
+$("gridLabels").onclick=()=>{ grid.labels=!grid.labels; $("gridLabels").classList.toggle("on",grid.labels); draw(); };
+
+$("fitBtn").onclick=()=>{ scale=1; tx=0; ty=0; clampPan(); draw(); };
+$("backBtn").onclick=()=>{ $("workspace").style.display="none"; $("home").style.display="flex"; };
+$("newPainting").onclick=()=>$("fileInput").click();
+$("fileInput").onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(f) loadFile(f); e.target.value=""; };
+
+/* ------------------------------- export ----------------------------------- */
+function composeCanvas(includeRef,list,alpha,withGrid){
+  const c=document.createElement("canvas"); c.width=imgW; c.height=imgH;
+  const cc=c.getContext("2d");
+  cc.fillStyle="#f4eee3"; cc.fillRect(0,0,imgW,imgH);
+  if(includeRef) cc.drawImage(refCanvas,0,0,imgW,imgH);
+  cc.globalAlpha=alpha;
+  for(const id of list){ if(layerCanvas[id]) cc.drawImage(layerCanvas[id],0,0,imgW,imgH); }
+  cc.globalAlpha=1;
+  if(withGrid&&grid.enabled){
+    cc.strokeStyle="rgba(26,24,32,"+grid.opacity+")"; cc.fillStyle="rgba(26,24,32,"+grid.opacity+")";
+    cc.lineWidth=Math.max(1,Math.min(imgW,imgH)/420);
+    cc.textAlign="center"; cc.textBaseline="middle";
+    for(let col=1;col<grid.cols;col++){ const x=imgW*col/grid.cols; cc.beginPath(); cc.moveTo(x,0); cc.lineTo(x,imgH); cc.stroke(); }
+    for(let r=1;r<grid.rows;r++){ const y=imgH*r/grid.rows; cc.beginPath(); cc.moveTo(0,y); cc.lineTo(imgW,y); cc.stroke(); }
+    if(grid.labels){ cc.font=(Math.min(imgW,imgH)*0.03)+"px sans-serif";
+      for(let r=0;r<grid.rows;r++)for(let col=0;col<grid.cols;col++) cc.fillText(String.fromCharCode(65+col)+(r+1),imgW*(col+0.5)/grid.cols,imgH*(r+0.5)/grid.rows); }
+  }
+  return c;
+}
+function downloadCanvas(c,name){
+  const a=document.createElement("a"); a.download=name; a.href=c.toDataURL("image/png"); a.click();
+}
+$("exportBtn").onclick=()=>{
+  const list=(mode==="add")?[stage]:stagesUpTo(stage);
+  const includeRef=view!=="guide";
+  const alpha=(view==="compare")?compareOpacity:1;
+  downloadCanvas(composeCanvas(includeRef,view==="reference"?[]:list,alpha,true),
+    "Painterly_"+currentFileName+"_"+stage.toLowerCase()+".png");
+  toast("Exported current view");
+};
+$("exportAllBtn").onclick=()=>{
+  STAGE_IDS.forEach((id,i)=>{
+    const list=[];
+    for(let j=0;j<=i;j++) if(layerCanvas[STAGE_IDS[j]]) list.push(STAGE_IDS[j]);
+    setTimeout(()=>downloadCanvas(composeCanvas(false,list,1,true),"Painterly_"+currentFileName+"_"+(i+1)+"_"+id.toLowerCase()+".png"),i*250);
+  });
+  toast("Exporting all stage guides…");
+};
+
+/* ------------------------------- boot ------------------------------------- */
+resizeCanvas();
+</script>
+</body>
+</html>

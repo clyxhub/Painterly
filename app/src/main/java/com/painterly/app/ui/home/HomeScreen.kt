@@ -3,7 +3,6 @@ package com.painterly.app.ui.home
 import android.net.Uri
 import android.text.format.DateUtils
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -68,7 +67,7 @@ fun HomeScreen(
     var pendingDelete by remember { mutableStateOf<ProjectSummary?>(null) }
 
     val picker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
+        contract = ActivityResultContracts.GetContent(),
     ) { uri -> if (uri != null) pendingUri = uri }
 
     LaunchedEffect(Unit) { viewModel.refresh() }
@@ -96,11 +95,7 @@ fun HomeScreen(
 
             Spacer(Modifier.height(22.dp))
             Button(
-                onClick = {
-                    picker.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
-                },
+                onClick = { picker.launch("image/*") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
