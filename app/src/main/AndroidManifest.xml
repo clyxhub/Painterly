@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Painterly is fully offline. No INTERNET permission is declared on purpose:
-         all analysis happens on-device and no image ever leaves the device. -->
+    <!-- Painterly is fully offline. There is deliberately no INTERNET permission:
+         no image, pixel, or parameter ever leaves the device. -->
+
+    <!-- Only needed on Android 9 and below to publish exports to the public
+         Pictures collection. Android 10+ uses scoped MediaStore with no permission. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <application
         android:allowBackup="true"
@@ -11,12 +17,13 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:largeHeap="true"
+        android:hardwareAccelerated="true"
         android:theme="@style/Theme.Painterly">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:theme="@style/Theme.Painterly">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

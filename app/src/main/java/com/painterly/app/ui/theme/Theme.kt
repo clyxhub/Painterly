@@ -5,38 +5,39 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
-
-private val DarkColors = darkColorScheme(
-    primary = Ochre,
-    onPrimary = Ink,
-    secondary = StudioTeal,
-    onSecondary = Ink,
-    tertiary = Terracotta,
-    background = Charcoal,
-    onBackground = WarmIvory,
-    surface = CharcoalSurface,
-    onSurface = WarmIvory,
-    surfaceVariant = CharcoalSurfaceHigh,
-    onSurfaceVariant = WarmIvoryDim,
-    outline = CanvasEdge,
-)
-
-private val LightOnSurfaceVariant = Color(0xFF5A5245)
 
 private val LightColors = lightColorScheme(
-    primary = OchreDim,
-    onPrimary = Paper,
-    secondary = StudioTeal,
-    onSecondary = Paper,
-    tertiary = Terracotta,
+    primary = Terracotta,
+    onPrimary = PaperElevated,
+    primaryContainer = TerracottaSoft,
+    onPrimaryContainer = Ink,
+    secondary = Sage,
+    onSecondary = PaperElevated,
     background = Paper,
     onBackground = Ink,
-    surface = WarmIvory,
+    surface = PaperElevated,
     onSurface = Ink,
-    surfaceVariant = WarmIvoryDim,
-    onSurfaceVariant = LightOnSurfaceVariant,
-    outline = CanvasEdge,
+    surfaceVariant = PaperDeep,
+    onSurfaceVariant = InkSoft,
+    outline = InkFaint,
+    outlineVariant = PaperDeep,
+)
+
+private val DarkColors = darkColorScheme(
+    primary = TerracottaSoft,
+    onPrimary = DeepNight,
+    primaryContainer = Terracotta,
+    onPrimaryContainer = NightInk,
+    secondary = Sage,
+    onSecondary = DeepNight,
+    background = DeepNight,
+    onBackground = NightInk,
+    surface = DeepNightElevated,
+    onSurface = NightInk,
+    surfaceVariant = DeepNightElevated,
+    onSurfaceVariant = NightInkSoft,
+    outline = NightInkSoft,
+    outlineVariant = DeepNightElevated,
 )
 
 @Composable

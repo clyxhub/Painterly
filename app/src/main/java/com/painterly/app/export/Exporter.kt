@@ -4,160 +4,119 @@ import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
-import com.painterly.app.image.ImageLoader
-import com.painterly.app.model.LayerId
-import com.painterly.app.model.StageParameters
-import com.painterly.app.processing.StageGenerators
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
+import com.painterly.app.model.GridSettings
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.min
 
-/**
- * Full-resolution export.
- *
- * Layers are regenerated at the requested resolution and composited one at a
- * time, so peak memory is only the source + canvas + the layer currently being
- * drawn. Exports preserve the reference aspect ratio because the canvas matches
- * the decoded source dimensions exactly.
- */
-class Exporter(private val context: Context) {
+/** Composes the visible painting state at full working resolution and writes it to Pictures. */
+object Exporter {
 
-    class Result(val locations: List<String>)
+    val PAPER_ARGB: Int = 0xFFF4EEE3.toInt()
 
-    suspend fun exportComposition(
-        uri: Uri,
-        params: StageParameters,
-        orderedLayers: List<LayerId>,
-        opacityOf: (LayerId) -> Float,
-        baseColor: Int,
-        maxDimension: Int,
-        fileName: String,
-    ): Result = withContext(Dispatchers.Default) {
-        val source = decode(uri, maxDimension)
-        val canvas = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
-        try {
-            val pixels = IntArray(source.width * source.height)
-            source.getPixels(pixels, 0, source.width, 0, 0, source.width, source.height)
-            drawLayers(canvas, pixels, source.width, source.height, params, orderedLayers, opacityOf, baseColor)
-            Result(listOf(save(canvas, fileName)))
-        } finally {
-            canvas.recycle()
-            source.recycle()
-        }
-    }
-
-    suspend fun exportStageSequence(
-        uri: Uri,
-        params: StageParameters,
-        baseColor: Int,
-        maxDimension: Int,
-        namePrefix: String,
-        onProgress: (Float, String) -> Unit,
-    ): Result = withContext(Dispatchers.Default) {
-        val source = decode(uri, maxDimension)
-        val canvas = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
-        val locations = ArrayList<String>()
-        try {
-            val pixels = IntArray(source.width * source.height)
-            source.getPixels(pixels, 0, source.width, 0, 0, source.width, source.height)
-
-            val draw = Canvas(canvas)
-            draw.drawColor(baseColor)
-
-            for (stage in 1..LayerId.LAST_STAGE) {
-                val layers = LayerId.forStage(stage)
-                for (layer in layers) {
-                    drawLayer(draw, pixels, source.width, source.height, params, layer, 1f)
-                }
-                val fileName = "${namePrefix}_stage_${stage}_${LayerId.stageTitle(stage).lowercase().replace(' ', '_')}.png"
-                locations += save(canvas, fileName)
-                onProgress(stage / LayerId.LAST_STAGE.toFloat(), LayerId.stageTitle(stage))
-            }
-            Result(locations)
-        } finally {
-            canvas.recycle()
-            source.recycle()
-        }
-    }
-
-    private fun decode(uri: Uri, maxDimension: Int): Bitmap =
-        ImageLoader.decode(context, uri, maxDimension)
-            ?: throw IOException("The reference image could not be decoded for export")
-
-    private fun drawLayers(
-        canvas: Bitmap,
-        pixels: IntArray,
+    fun compose(
         width: Int,
         height: Int,
-        params: StageParameters,
-        orderedLayers: List<LayerId>,
-        opacityOf: (LayerId) -> Float,
-        baseColor: Int,
-    ) {
-        val draw = Canvas(canvas)
-        draw.drawColor(baseColor)
-        for (layer in orderedLayers) {
-            drawLayer(draw, pixels, width, height, params, layer, opacityOf(layer))
-        }
+        reference: Bitmap?,
+        layers: List<Bitmap>,
+        layerAlpha: Float,
+        grid: GridSettings,
+        paperColor: Int,
+    ): Bitmap {
+        val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        canvas.drawColor(paperColor)
+
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+        val full = Rect(0, 0, width, height)
+        if (reference != null) canvas.drawBitmap(reference, null, full, paint)
+
+        paint.alpha = (layerAlpha.coerceIn(0f, 1f) * 255f).toInt()
+        for (layer in layers) canvas.drawBitmap(layer, null, full, paint)
+
+        if (grid.enabled) drawGrid(canvas, width, height, grid)
+        return out
     }
 
-    private fun drawLayer(
-        canvas: Canvas,
-        pixels: IntArray,
-        width: Int,
-        height: Int,
-        params: StageParameters,
-        layer: LayerId,
-        opacity: Float,
-    ) {
-        val layerPixels = StageGenerators.generate(layer, pixels, width, height, params)
-        val bitmap = Bitmap.createBitmap(layerPixels, width, height, Bitmap.Config.ARGB_8888)
-        val paint = Paint().apply {
-            isFilterBitmap = true
-            alpha = (opacity.coerceIn(0f, 1f) * 255f).toInt().coerceIn(0, 255)
-        }
-        canvas.drawBitmap(bitmap, 0f, 0f, paint)
-        bitmap.recycle()
-    }
-
-    private fun save(bitmap: Bitmap, fileName: String): String {
+    fun exportToPictures(context: Context, bitmap: Bitmap, displayName: String): Uri? {
         val resolver = context.contentResolver
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val values = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
-                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 put(
                     MediaStore.Images.Media.RELATIVE_PATH,
-                    "${Environment.DIRECTORY_PICTURES}/Painterly",
+                    Environment.DIRECTORY_PICTURES + "/Painterly",
                 )
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
-            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                ?: throw IOException("Could not create an export file")
-            try {
-                resolver.openOutputStream(uri)?.use {
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
-                } ?: throw IOException("Could not open the export file for writing")
-            } finally {
-                val done = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
-                resolver.update(uri, done, null, null)
-            }
-            "Pictures/Painterly/$fileName"
+        }
+        val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         } else {
-            val directory = File(
-                context.getExternalFilesDir(Environment.DIRECTORY_PICTURES),
-                "Painterly",
-            ).apply { mkdirs() }
-            val file = File(directory, fileName)
-            FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            file.absolutePath
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        }
+        val uri = resolver.insert(collection, values) ?: return null
+        try {
+            resolver.openOutputStream(uri)?.use { stream ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+            } ?: return null
+        } catch (e: Exception) {
+            resolver.delete(uri, null, null)
+            return null
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            values.clear()
+            values.put(MediaStore.Images.Media.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+        }
+        return uri
+    }
+
+    fun timestampedName(prefix: String): String {
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        return "Painterly_${prefix}_$stamp.png"
+    }
+
+    private fun drawGrid(canvas: Canvas, width: Int, height: Int, grid: GridSettings) {
+        val opacity = (grid.opacity.coerceIn(0.05f, 1f) * 255f).toInt()
+        val line = Paint().apply {
+            color = Color.argb(opacity, 30, 28, 34)
+            strokeWidth = (min(width, height) / 420f).coerceAtLeast(1.5f)
+            isAntiAlias = true
+        }
+        val text = Paint().apply {
+            color = Color.argb((grid.opacity.coerceIn(0.05f, 1f) * 255f).toInt(), 30, 28, 34)
+            textSize = min(width, height) * 0.030f
+            isAntiAlias = true
+            isFakeBoldText = true
+        }
+
+        for (c in 1 until grid.columns) {
+            val x = width.toFloat() * c / grid.columns
+            canvas.drawLine(x, 0f, x, height.toFloat(), line)
+        }
+        for (r in 1 until grid.rows) {
+            val y = height.toFloat() * r / grid.rows
+            canvas.drawLine(0f, y, width.toFloat(), y, line)
+        }
+        if (grid.labels) {
+            for (r in 0 until grid.rows) {
+                for (c in 0 until grid.columns) {
+                    val cx = width.toFloat() * (c + 0.5f) / grid.columns
+                    val cy = height.toFloat() * (r + 0.5f) / grid.rows
+                    val label = "${('A' + c)}${r + 1}"
+                    canvas.drawText(label, cx, cy, text)
+                }
+            }
         }
     }
 }

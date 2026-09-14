@@ -1,3 +1,3 @@
-# Painterly does not currently enable minification. Keep the file so release
-# builds have a valid ProGuard configuration if minification is enabled later.
+# Painterly keeps everything deterministic and on-device. No reflection-heavy
+# libraries are used, so the default rules are sufficient.
 -dontwarn org.jetbrains.annotations.**
